@@ -1,0 +1,65 @@
+async function getWildLocations(locations){
+    footerP("Fetching wild locations")
+    const rawWildLocations = await fetch(`./src/locations/encounters.json`)
+    const jsonWildLocations = await rawWildLocations.json()
+
+    return regexWildLocations(jsonWildLocations, locations)   
+}
+
+async function getRaidLocations(locations){
+    footerP("Fetching raid locations")
+    const rawRaidLocations = await fetch(`./data/cfru/src/Tables/raid_encounters.h`)
+    const textRaidLocations = await rawRaidLocations.text()
+
+    return regexRaidLocations(textRaidLocations, locations)   
+}
+
+async function buildLocationsObj(){
+    let locations = {}
+
+    locations = await getWildLocations(locations)
+    locations = await getRaidLocations(locations)
+
+    localStorage.setItem("locations", LZString.compressToUTF16(JSON.stringify(locations)))
+    return locations
+}
+
+
+async function fetchLocationsObj(){
+    if(!localStorage.getItem("locations")){
+        window.locations = await buildLocationsObj()
+    }
+    else{
+        window.locations = await JSON.parse(LZString.decompressFromUTF16(localStorage.getItem("locations")))   
+    }
+
+    if (settings.includes("saveRandomizedSpecies")) {
+        Object.keys(locations).forEach(zone => {
+            Object.keys(locations[zone]).forEach(method => {
+                const renamedMethod = {};
+                Object.keys(locations[zone][method]).forEach(speciesName => {
+                    const randomized = (species[speciesName] && species[speciesName].randomized) || speciesName;
+                    if (randomized in renamedMethod) {
+                        renamedMethod[randomized] += locations[zone][method][speciesName];
+                    } else {
+                        renamedMethod[randomized] = locations[zone][method][speciesName];
+                    }
+                });
+                locations[zone][method] = renamedMethod;
+            });
+        });
+    }
+
+    let counter = 0
+    window.locationsTracker = []
+    Object.keys(locations).forEach(zone => {
+        Object.keys(locations[zone]).forEach(method => {
+            Object.keys(locations[zone][method]).forEach(speciesName => {
+                locationsTracker[counter] = {}
+                locationsTracker[counter]["key"] = `${zone}\\${method}\\${speciesName}`
+                locationsTracker[counter]["filter"] = []
+                counter++
+            })
+        })
+    })
+}
